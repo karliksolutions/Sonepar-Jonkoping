@@ -1,0 +1,20 @@
+{
+  // Byt "name" till exakt samma namn som din Worker har i Cloudflare.
+  "name": "sonepar-hyllsok",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+
+  // Allt i mappen public serveras som vanliga filer (index.html, logotypen).
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "jkpg_db",
+      "database_name": "jkpg_db",
+      "database_id": "9dcad11a-ee84-4d3b-9fb1-660ab936a237"
+    }
+  ]
+}
