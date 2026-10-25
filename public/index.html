@@ -319,7 +319,11 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
     const r = await fetch(url, opts);
     let data = {};
     try { data = await r.json(); } catch (e) {}
-    if (r.status === 401 && url.indexOf('/api/admin/') === 0) { showLogin('Du har loggats ut, logga in igen'); throw new Error('401'); }
+    if (r.status === 401 && url.indexOf('/api/admin/') === 0) {
+      // Meddela bara om utloggning om man faktiskt var inloggad, inte när adminläget öppnas.
+      showLogin(adminView.hidden ? '' : 'Du har loggats ut, logga in igen');
+      throw new Error('401');
+    }
     if (!r.ok) throw new Error(data.error || 'Något gick fel');
     return data;
   }
@@ -337,6 +341,7 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
   }
   function closeAdmin() {
     admin.hidden = true;
+    loginView.hidden = false; adminView.hidden = true;
     document.querySelector('main').removeAttribute('aria-hidden');
     clearTimeout(idleTimer);
     password.value=''; notice(loginNotice,''); notice(adminNotice,'');
