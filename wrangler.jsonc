@@ -1,10 +1,8 @@
 {
-  // Byt "name" till exakt samma namn som din Worker har i Cloudflare.
-  "name": "sonepar-hyllsok",
+  "name": "sonepar-jonkoping",
   "main": "src/index.js",
   "compatibility_date": "2026-10-01",
 
-  // Allt i mappen public serveras som vanliga filer (index.html, logotypen).
   "assets": {
     "directory": "./public",
     "binding": "ASSETS"
