@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>Sonepar | Hyllsök</title>
+<meta name="description" content="Skriv eller skanna ett artikelnummer och se direkt vilken hyllsida artikeln ligger på.">
+<link rel="icon" type="image/png" href="/sonepar-favicon-png-data.png">
+<link rel="apple-touch-icon" href="/sonepar-favicon-png-data.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Sonepar | Hyllsök">
+<meta property="og:description" content="Skriv eller skanna ett artikelnummer och se direkt vilken hyllsida artikeln ligger på.">
+<meta property="og:image" content="https://sonepar-jonkoping.karliksolutions.workers.dev/sonepar-favicon-png-data.png">
+<meta property="og:url" content="https://sonepar-jonkoping.karliksolutions.workers.dev/">
+<meta name="twitter:card" content="summary">
 <style>
 :root { --navy:#283785; --cyan:#009bd2; --text:#17233b; --hint:#697587; --bg:#f6f8fb; --line:#d3d9e5; --red:#b42336; --green:#1d7a4a; }
 * { box-sizing:border-box; }
@@ -96,10 +105,148 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
   .count { text-align:right; }
   .editor-actions .spacer { display:none; }
 }
+
+/* ---------- Butikskarta ---------- */
+:root { --wall:#a3abb9; --shelf:#c4cad5; --shelf-light:#dfe3ea; --label:#6b7586; }
+.layout { width:100%; display:grid; grid-template-columns:minmax(0,1fr); gap:36px; align-items:center; justify-items:center; }
+.layout.has-map { width:min(1500px,100%); }
+.layout.has-map .map-card { width:min(100%, calc((100vh - 230px) * var(--ratio, 1.163) + 40px)); justify-self:center; }
+.map-card[hidden] { display:none; }
+.map-card { position:relative; overflow:hidden; animation:mapIn .35s ease-out; }
+@keyframes mapIn { from { opacity:0; transform:translateY(12px) scale(.98); } to { opacity:1; transform:none; } }
+.timer { position:absolute; left:0; bottom:0; height:5px; width:100%; background:var(--cyan); opacity:.55; transform-origin:left; }
+.timer.run { animation:countdown linear forwards; }
+@keyframes countdown { from { transform:scaleX(1); } to { transform:scaleX(0); } }
+.map-card { background:#fff; border:2px solid #e3e8f0; border-radius:20px; box-shadow:0 12px 30px rgba(23,35,59,.05); padding:18px; }
+.map-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:0 4px 10px; }
+.map-title { font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#515e70; }
+.map-hint { font-size:14px; color:var(--hint); }
+.map-hint strong { color:var(--navy); }
+svg { display:block; width:100%; height:auto; }
+
+/* Karta */
+.wall { fill:var(--wall); }
+.door { fill:#3a4252; }
+.shelf { fill:var(--shelf); }
+.shelf.light { fill:var(--shelf-light); }
+.floor { fill:#fff; }
+.lbl { font:700 40px Arial,Helvetica,sans-serif; fill:var(--label); text-anchor:middle; dominant-baseline:central; transition:fill .2s; }
+.area { font:800 54px Arial,Helvetica,sans-serif; fill:#3a4252; text-anchor:middle; dominant-baseline:central; }
+.zone { fill:var(--cyan); opacity:0; transition:opacity .2s; }
+.zone.on { opacity:1; }
+.lbl.on { fill:var(--navy); font-size:58px; font-weight:800; }
+.dim .shelf, .dim .wall { opacity:.55; transition:opacity .25s; }
+.pulse { fill:none; stroke:var(--cyan); stroke-width:8; opacity:0; }
+.pulse.on { animation:pulse 1.6s ease-out infinite; }
+@keyframes pulse { 0% { opacity:.85; r:20px; } 100% { opacity:0; r:110px; } }
+.you circle { fill:var(--navy); }
+.you .ring { fill:none; stroke:var(--navy); stroke-width:5; opacity:.35; }
+.you text { font:700 36px Arial,Helvetica,sans-serif; fill:var(--navy); text-anchor:end; dominant-baseline:central; }
+/* Vit kontur runt texterna så att de går att läsa även där gångvägen passerar */
+.lbl, .area, .you text { stroke:#fff; stroke-width:10px; stroke-linejoin:round; paint-order:stroke fill; }
+.route { fill:none; stroke:var(--cyan); stroke-width:10; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:4 26; opacity:0; transition:opacity .25s; }
+.route.on { opacity:.9; animation:march 1s linear infinite; }
+@keyframes march { to { stroke-dashoffset:-30; } }
+
+/* Stor skärm (butiksskärm, dator): sök till vänster, karta till höger */
+@media (min-width:1200px) {
+  .layout.has-map { grid-template-columns:minmax(360px,540px) minmax(0,1fr); gap:clamp(24px,3vw,48px); }
+  .layout.has-map .result-number { font-size:clamp(110px,11vw,178px); }
+}
+@media (min-width:1200px) and (max-height:860px) {
+  main:has(.has-map) { padding-top:24px; padding-bottom:24px; }
+  .layout.has-map .brand { margin-bottom:22px; }
+  .layout.has-map .result { min-height:0; margin-bottom:16px; }
+  .layout.has-map .footer { margin-top:24px; }
+}
+/* Surfplatta och mobil: kartan kommer upp som en popup över sidan */
+.map-backdrop, .map-close { display:none; }
+@media (max-width:1199px) {
+  .layout.has-map .map-backdrop { display:block; position:fixed; inset:0; z-index:7; background:rgba(23,35,59,.45); backdrop-filter:blur(3px); animation:fadeIn .25s ease-out; }
+  .layout .map-card, .layout.has-map .map-card { position:fixed; inset:0; margin:auto; z-index:8; height:fit-content; max-height:calc(100vh - 24px);
+              width:min(calc(100vw - 24px), calc((100vh - 130px) * var(--ratio, 1.163) + 40px)); box-shadow:0 24px 60px rgba(23,35,59,.3); }
+  .map-head { align-items:center; }
+  .map-hint { font-size:clamp(17px,2.4vw,24px); color:var(--text); }
+  .map-close { display:flex; align-items:center; justify-content:center; flex-shrink:0; width:46px; height:46px; margin-left:auto;
+               border:2px solid var(--line); border-radius:12px; background:#fff; color:var(--text); font:700 26px/1 Arial,Helvetica,sans-serif; cursor:pointer; }
+  .map-close:focus-visible { outline:none; border-color:var(--cyan); }
+  .map-title { display:none; }
+}
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@media (max-width:520px) { .map-card { padding:10px; border-radius:14px; } }
+@media (prefers-reduced-motion:reduce) {
+  .map-card, .map-backdrop { animation:none!important; } .timer.run { animation:none; opacity:0; }
+  .zone, .lbl { transition:none; } .pulse.on { animation:none; opacity:.6; r:60px; } .route.on { animation:none; }
+}
+
+/* Import / export */
+.import { margin-bottom:20px; }
+.import-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
+.import-head h2 { margin:0; font-size:20px; color:var(--navy); }
+.import-src { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:16px; }
+.file-btn { display:inline-flex; align-items:center; }
+.file-name { color:var(--hint); font-size:14px; }
+.or { display:flex; align-items:center; gap:12px; color:var(--hint); font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; margin:18px 0 10px; }
+.or::before, .or::after { content:''; flex:1; height:1px; background:#e3e8f0; }
+textarea.paste { min-height:110px; font:500 15px/1.4 Consolas,Menlo,monospace; }
+.chips { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 12px; }
+.badge { display:inline-block; font-size:13px; font-weight:700; border-radius:999px; padding:5px 11px; background:#eef1f6; color:var(--hint); white-space:nowrap; }
+.badge.new { background:#e3f4ea; color:var(--green); }
+.badge.chg { background:#e0f3fa; color:#00739c; }
+.badge.err { background:#fbe7ea; color:var(--red); }
+.badge.warn { background:#fff4dc; color:#8a5a00; }
+#importRows td.note { color:var(--hint); font-size:14px; }
+#importRows tr { cursor:default; }
+#importRows tr:hover td { background:none; }
+
+/* Listor i adminläget: sökt men saknas, ändringslogg */
+.log-list { margin:6px 24px 16px; }
+.log-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid #edf0f5; }
+.log-row:last-child { border-bottom:0; }
+.log-main { flex:1; min-width:0; }
+.log-title { font-weight:700; color:var(--text); overflow-wrap:anywhere; }
+.log-meta { color:var(--hint); font-size:13px; margin-top:3px; }
+.log-row.done .log-title { color:var(--hint); }
+.log-empty { color:var(--hint); padding:14px 0; }
+.log-tag { font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--hint); }
+.btn-sm { height:38px; padding:0 14px; font-size:14px; border-radius:10px; flex-shrink:0; }
+.chip.warn { color:#8a5a00; background:#fff4dc; }
+@media (max-width:620px) { .log-list { margin:6px 16px 14px; } .log-row { flex-wrap:wrap; } }
+
+/* Inställning i adminläget */
+.settings { margin-bottom:20px; padding:0; }
+.settings > summary { list-style:none; display:flex; align-items:center; gap:12px; padding:18px 24px; cursor:pointer; user-select:none; border-radius:14px; }
+.settings > summary::-webkit-details-marker { display:none; }
+.settings > summary:focus-visible { outline:none; box-shadow:0 0 0 4px rgba(0,155,210,.25); }
+.settings > summary:hover .chev { border-color:var(--navy); }
+.settings[open] > summary { border-bottom:1px solid #edf0f5; border-radius:14px 14px 0 0; }
+.settings > .setting, .settings > .map-preview { margin:18px 24px; }
+.chip { font-size:13px; font-weight:700; color:var(--hint); background:#eef1f6; border-radius:999px; padding:4px 10px; }
+.chip.on { color:#fff; background:var(--cyan); }
+.chev { margin-left:auto; width:10px; height:10px; border-right:2.5px solid #8993a4; border-bottom:2.5px solid #8993a4; transform:rotate(45deg); transition:transform .15s; }
+.settings[open] .chev { transform:rotate(-135deg); }
+.setting { display:flex; align-items:center; justify-content:space-between; gap:20px; }
+.settings > .setting + .setting { border-top:1px solid #edf0f5; padding-top:18px; }
+.setting-text strong { color:var(--text); }
+.map-preview { display:flex; justify-content:center; padding:12px; background:var(--bg); border-radius:12px; }
+.map-preview svg { width:auto; max-width:100%; height:240px; }
+.map-preview.off { opacity:.45; }
+@media (max-width:620px) { .setting { flex-wrap:wrap; } .map-preview svg { height:180px; } }
+.setting-title { font-weight:700; font-size:17px; color:var(--navy); }
+.setting-text { color:var(--hint); font-size:14px; margin-top:4px; line-height:1.4; }
+.switch { position:relative; flex-shrink:0; width:64px; height:36px; cursor:pointer; }
+.switch input { position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+.slider { position:absolute; inset:0; background:#cfd6e2; border-radius:999px; transition:background .15s; }
+.slider::after { content:''; position:absolute; top:4px; left:4px; width:28px; height:28px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .15s; }
+.switch input:checked + .slider { background:var(--cyan); }
+.switch input:checked + .slider::after { transform:translateX(28px); }
+.switch input:focus-visible + .slider { box-shadow:0 0 0 4px rgba(0,155,210,.25); }
+.sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
 </style>
 </head>
 <body>
 <main>
+  <div class="layout" id="layout">
   <div class="panel">
     <div class="brand" role="img" aria-label="Sonepar">
       <img src="./sonepar-favicon-png-data.png" alt="Sonepar logotyp">
@@ -120,6 +267,30 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
     </form>
     <p class="subtext">Skriv eller skanna ett artikelnummer och tryck Enter</p>
     <div class="footer"><span id="count">Laddar artikelregistret…</span><span id="status"></span> · Av Karlik solutions · <button type="button" class="admin-link" id="openAdmin">Admin</button></div>
+  </div>
+    <div class="map-backdrop" id="mapBackdrop"></div>
+    <div class="map-card" id="mapCard" role="dialog" aria-label="Butikskarta" hidden>
+      <div class="map-head">
+        <span class="map-title">Butikskarta</span>
+        <span class="map-hint" id="mapHint"></span>
+        <button type="button" class="map-close" id="mapClose" aria-label="Stäng kartan">✕</button>
+      </div>
+      <svg id="map" viewBox="-60 -60 2120 1840" role="img" aria-label="Karta över butiken">
+        <g id="mapRoot">
+          <g id="base"></g>
+          <path id="route" class="route" d=""></path>
+          <g id="zones"></g>
+          <circle id="pulse" class="pulse" cx="0" cy="0" r="20"></circle>
+          <g id="labels"></g>
+          <g class="you" id="you" transform="translate(1715 1460)">
+            <circle class="ring" r="36"></circle>
+            <circle r="18"></circle>
+            <text class="you-text" x="-52" y="0">Du är här</text>
+          </g>
+        </g>
+      </svg>
+      <div class="timer" id="timer"></div>
+    </div>
   </div>
 </main>
 
@@ -142,9 +313,86 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
       <h1>Artikelregister</h1>
       <div class="admin-actions">
         <button class="btn btn-primary" type="button" id="newBtn">+ Ny artikel</button>
+        <button class="btn" type="button" id="importBtn">Importera</button>
+        <button class="btn" type="button" id="exportBtn">Exportera</button>
         <button class="btn" type="button" id="logoutBtn">Logga ut</button>
       </div>
     </div>
+
+    <details class="card settings" id="mapSettings">
+      <summary>
+        <span class="setting-title">Butikskarta</span>
+        <span class="chip" id="mapSummary">Av</span>
+        <span class="chev" aria-hidden="true"></span>
+      </summary>
+      <div class="setting">
+        <div>
+          <div class="setting-title">Butikskarta på den här skärmen</div>
+          <div class="setting-text">Visar var hyllsidan finns i 10 sekunder efter en sökning. Gäller bara den här datorn.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="mapToggle">
+          <span class="slider" aria-hidden="true"></span>
+          <span class="sr">Visa butikskarta</span>
+        </label>
+      </div>
+      <div class="setting">
+        <div>
+          <div class="setting-title">Kartans riktning</div>
+          <div class="setting-text">Vrid kartan så att den stämmer med hur man står framför skärmen. Nu: <strong id="rotText">Lager uppåt</strong></div>
+        </div>
+        <button class="btn" type="button" id="rotBtn">↻ Vrid 90°</button>
+      </div>
+      <div class="map-preview" id="mapPreview" aria-hidden="true"></div>
+    </details>
+
+    <details class="card settings" id="missingBox">
+      <summary>
+        <span class="setting-title">Sökt men saknas</span>
+        <span class="chip" id="missingChip">Inga</span>
+        <span class="chev" aria-hidden="true"></span>
+      </summary>
+      <div class="log-list" id="missingList"></div>
+    </details>
+
+    <details class="card settings" id="logBox">
+      <summary>
+        <span class="setting-title">Senaste ändringar</span>
+        <span class="chip" id="logChip"></span>
+        <span class="chev" aria-hidden="true"></span>
+      </summary>
+      <div class="log-list" id="logList"></div>
+    </details>
+
+    <section id="importPanel" class="card import" aria-label="Importera artiklar" hidden>
+      <div class="import-head">
+        <h2>Importera artiklar</h2>
+        <button class="btn" type="button" id="closeImport">Stäng</button>
+      </div>
+      <div class="setting-text">Kolumner: <strong>Artikelnummer</strong>, <strong>Hyllsida</strong> och gärna <strong>Beteckning</strong>. Nya artiklar läggs till och befintliga uppdateras. Inget tas bort. Max 1 000 rader åt gången.</div>
+      <div class="import-src">
+        <label class="btn btn-primary file-btn">Välj Excel- eller CSV-fil<input type="file" id="importFile" accept=".xlsx,.csv,.txt" hidden></label>
+        <span class="file-name" id="importFileName"></span>
+      </div>
+      <div class="or">eller klistra in från Excel</div>
+      <label for="importPaste" class="sr">Klistra in rader från Excel</label>
+      <textarea id="importPaste" class="input paste" spellcheck="false" placeholder="Markera raderna i Excel, tryck Ctrl+C och klistra in här med Ctrl+V"></textarea>
+      <div id="importNotice" class="notice" role="status" aria-live="polite"></div>
+      <div id="importResult" hidden>
+        <div class="chips" id="importChips"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Status</th><th>Artikelnummer</th><th>Hyllsida</th><th>Beteckning</th><th>Notering</th></tr></thead>
+            <tbody id="importRows"></tbody>
+          </table>
+        </div>
+        <p class="more" id="importMore" hidden></p>
+        <div class="editor-actions">
+          <button class="btn btn-primary" type="button" id="importSave">Spara</button>
+          <button class="btn" type="button" id="importCancel">Avbryt</button>
+        </div>
+      </div>
+    </section>
 
     <form id="editor" class="editor card" autocomplete="off" novalidate hidden>
       <h2 id="editorTitle">Ny artikel</h2>
@@ -248,12 +496,216 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
   window.addEventListener('online', function(){ sync(false); });
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) sync(false); });
 
+  // ---------- Butikskarta ----------
+  const MAP_KEY = 'hyllsok.karta';          // på/av sparas per skärm (webbläsare)
+  const MAP_SECONDS = 10;                   // hur länge kartan visas efter en sökning
+  const NS = 'http://www.w3.org/2000/svg';
+  const YOU = [1715, 1460];                 // Var skärmen står: framför kassan, vid entrén
+  const ROT_KEY = 'hyllsok.kartriktning';  // 0, 90, 180 eller 270 grader, sparas per skärm
+  function mapEnabled() { try { return localStorage.getItem(MAP_KEY) === 'på'; } catch (e) { return false; } }
+  function setMapEnabled(on) { try { if (on) localStorage.setItem(MAP_KEY,'på'); else localStorage.removeItem(MAP_KEY); } catch (e) {} }
+
+  // ---------- Fast inredning ----------
+  const base = [
+    ['rect','wall',{x:0,y:0,width:608,height:56}],
+    ['rect','wall',{x:1045,y:0,width:955,height:56}],
+    ['rect','door',{x:608,y:0,width:28,height:77}],
+    ['rect','door',{x:1017,y:0,width:28,height:77}],
+    ['rect','wall',{x:0,y:0,width:56,height:607}],
+    ['rect','wall',{x:1943,y:0,width:57,height:1137}],
+    ['rect','wall',{x:0,y:655,width:56,height:70}],
+    ['rect','wall',{x:0,y:1314,width:56,height:71}],
+    ['polygon','wall',{points:'0,1570 95,1665 1151,1665 1151,1720 0,1720'}],
+    ['rect','door',{x:1915,y:1297,width:85,height:16}],
+    ['rect','door',{x:1915,y:1557,width:85,height:16}],
+    ['polygon','shelf',{points:'233,1118 286,1133 272,1185 221,1170'}],
+    ['polygon','shelf',{points:'288,1133 797,1272 782,1327 274,1188'}],
+    ['polygon','shelf',{points:'233,1321 286,1336 272,1388 221,1373'}],
+    ['polygon','shelf',{points:'288,1336 797,1474 782,1529 274,1391'}],
+    ['rect','shelf light',{x:1756,y:715,width:101,height:422}],      // låg pall (21/22)
+    ['rect','wall',{x:1274,y:1597,width:516,height:200,rx:30}],     // kassadisk
+    ['rect','floor',{x:1304,y:1627,width:456,height:200,rx:28}]
+  ];
+  [276,580,961,1342,1643].forEach(x => base.push(['rect','shelf',{x,y:272,width:56,height:335}]));
+  [276,581,885,1153,1514].forEach(x => base.push(['rect','shelf',{x,y:715,width:56,height:334}]));
+
+  // ---------- Hyllsidor: markering + etikettens position ----------
+  const zones = {};
+  const side = (x, y, h, left) => ['rect',{x: left ? x-32 : x+62, y, width:26, height:h, rx:6}];
+  const top = [[276,'01','02'],[580,'03','04'],[961,'05','06'],[1342,'07','08'],[1643,'09','10']];
+  const bot = [[276,'11','12'],[581,'13','14'],[885,'15','16'],[1153,'17','18'],[1514,'19','20']];
+  top.forEach(([x,a,b]) => { zones[a]={shape:side(x,272,335,true),label:[x-34,300]}; zones[b]={shape:side(x,272,335,false),label:[x+88,300]}; });
+  bot.forEach(([x,a,b]) => { zones[a]={shape:side(x,715,334,true),label:[x-34,738]}; zones[b]={shape:side(x,715,334,false),label:[x+88,738]}; });
+  Object.assign(zones, {
+    '21': {shape:['rect',{x:1724,y:715,width:26,height:422,rx:6}], label:[1724,741]},
+    '22': {shape:['rect',{x:1863,y:715,width:26,height:422,rx:6}], label:[1889,741]},
+    '23': {shape:['polygon',{points:'233,1118 286,1133 272,1185 221,1170'}], label:[190,1141]},
+    '24': {shape:['polygon',{points:'290,1127 799,1266 805,1243 296,1104'}], label:[714,1212]},
+    '25': {shape:['polygon',{points:'272,1194 780,1333 774,1356 266,1217'}], label:[714,1390]},
+    '26': {shape:['polygon',{points:'233,1321 286,1336 272,1388 221,1373'}], label:[190,1328]},
+    '27': {shape:['polygon',{points:'290,1330 799,1468 805,1445 296,1307'}], label:[469,1340]},
+    '28': {shape:['polygon',{points:'272,1397 780,1535 774,1558 266,1420'}], label:[469,1520]},
+    '29': {shape:['polygon',{points:'6,1564 101,1659 118,1642 23,1547'}], label:[90,1560]},
+    '30': {shape:['rect',{x:110,y:1633,width:1035,height:26,rx:6}], label:[1067,1592]},
+    '80': {shape:['rect',{x:62,y:1314,width:26,height:71,rx:6}], label:[125,1350]},
+    '90': {shape:['rect',{x:62,y:655,width:26,height:70,rx:6}], label:[125,690]},
+    '100':{shape:['rect',{x:62,y:62,width:26,height:545,rx:6}], label:[140,422]},
+    '110':{shape:['rect',{x:62,y:62,width:540,height:26,rx:6}], label:[548,125]},
+    '120':{shape:['rect',{x:1051,y:62,width:308,height:26,rx:6}], label:[1100,125]},
+    '130':{shape:['rect',{x:1371,y:62,width:566,height:26,rx:6}], label:[1420,125]},
+    '142':{shape:['rect',{x:1911,y:62,width:26,height:604,rx:6}], label:[1858,200]},
+    '141':{shape:['rect',{x:1911,y:678,width:26,height:459,rx:6}], label:[1858,672]}
+  });
+
+  // ---------- Gångväg från skärmen ----------
+  const CORR = 1085;   // gång mellan nedre hyllraden och de sneda hyllorna
+  const MID  = 660;    // tvärgång mellan hyllraderna
+  const BOT_AISLES = [170, 456, 761, 1047, 1361, 1663];   // fria gångar i nedre raden
+  const near = (x, list) => list.reduce((a,b) => Math.abs(b-x) < Math.abs(a-x) ? b : a);
+  const START = [YOU, [1680, CORR]];
+  top.forEach(([x,a,b]) => [[a,x-58],[b,x+114]].forEach(([k,px]) => {
+    const bx = near(px, BOT_AISLES);
+    zones[k].walk = [[bx,CORR],[bx,MID],[px,MID],[px,440]];
+  }));
+  bot.forEach(([x,a,b]) => [[a,x-58],[b,x+114]].forEach(([k,px]) => { zones[k].walk = [[px,CORR],[px,882]]; }));
+  const W = {
+    '21': [[1690,CORR],[1690,926]],
+    '22': [[1900,1180],[1900,926]],
+    '141':[[1900,1180],[1900,907]],
+    '142':[[1900,1180],[1900,364]],
+    '23': [[170,CORR],[170,1150]],
+    '24': [[547,CORR],[547,1150]],
+    '25': [[900,1370],[523,1320]],
+    '26': [[170,CORR],[170,1350]],
+    '27': [[900,1370],[560,1320]],
+    '28': [[900,1570],[523,1540]],
+    '29': [[900,1570],[150,1570]],
+    '30': [[900,1590],[627,1600]],
+    '80': [[170,CORR],[170,1350]],
+    '90': [[170,CORR],[170,690]],
+    '100':[[170,CORR],[170,334]],
+    '110':[[170,CORR],[170,150],[332,150]],
+    '120':[[1047,CORR],[1047,MID],[1180,MID],[1180,150],[1205,150]],
+    '130':[[1361,CORR],[1361,MID],[1520,MID],[1520,150],[1654,150]]
+  };
+  for (const k in W) zones[k].walk = W[k];
+  function routeTo(z, cx, cy) {
+    const w = z.walk || [];
+    // Mål till höger eller nedanför gången: gå direkt dit utan att först gå upp till gången.
+    const begin = (w.length && w[0][1] > CORR) ? [YOU] : START;
+    const pts = begin.concat(w, [[cx, cy]]);
+    return 'M' + pts.map(q => q.map(Math.round).join(' ')).join(' L');
+  }
+
+  // ---------- Rita ----------
+  function el(tag, attrs, cls) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (cls) e.setAttribute('class', cls);
+    return e;
+  }
+  const gBase = document.getElementById('base'), gZones = document.getElementById('zones'), gLabels = document.getElementById('labels');
+  base.forEach(([t,c,a]) => gBase.appendChild(el(t,a,c)));
+  const t = el('text',{x:826,y:58},'area'); t.textContent='Lager'; gBase.appendChild(t);
+  const e2 = el('text',{x:1902,y:1442},'area'); e2.textContent='Entré'; gBase.appendChild(e2);
+  const e3 = el('text',{x:1532,y:1676},'area'); e3.textContent='Kassa'; gBase.appendChild(e3);
+  for (const k in zones) {
+    const z = zones[k];
+    z.zone = el(z.shape[0], z.shape[1], 'zone'); gZones.appendChild(z.zone);
+    z.text = el('text',{x:z.label[0],y:z.label[1]},'lbl'); z.text.textContent = k; gLabels.appendChild(z.text);
+  }
+  const svg = document.getElementById('map'), pulse = document.getElementById('pulse'), route = document.getElementById('route'), hint = document.getElementById('mapHint');
+  let current = null, hideTimer = 0;
+  const layout = document.getElementById('layout'), mapCard = document.getElementById('mapCard'), timer = document.getElementById('timer');
+
+  function showMap() {
+    clearTimeout(hideTimer);
+    mapCard.hidden = false; layout.classList.add('has-map');
+    timer.classList.remove('run'); void timer.offsetWidth;
+    timer.style.animationDuration = MAP_SECONDS + 's'; timer.classList.add('run');
+    hideTimer = setTimeout(hideMap, MAP_SECONDS * 1000);
+  }
+  function hideMap() {
+    clearTimeout(hideTimer);
+    mapCard.hidden = true; layout.classList.remove('has-map');
+  }
+  // Popupen (surfplatta/mobil) stängs med krysset, genom att trycka utanför eller med Esc.
+  // Fokus lämnas kvar i sökfältet så att nästa skanning fungerar direkt.
+  function closeMap() { hideMap(); field.focus(); field.select(); }
+  document.getElementById('mapClose').addEventListener('click', closeMap);
+  document.getElementById('mapBackdrop').addEventListener('click', closeMap);
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !mapCard.hidden) hideMap(); });
+
+  // ---------- Kartans riktning ----------
+  const ROT_NAMES = { 0:'Lager uppåt', 90:'Vänstra väggen (100) uppåt', 180:'Kassan uppåt', 270:'Entrén uppåt' };
+  const ROT_T = { 0:'', 90:'translate(1720 0) rotate(90)', 180:'translate(2000 1720) rotate(180)', 270:'translate(0 2000) rotate(270)' };
+  function getRotation() { try { const r = Number(localStorage.getItem(ROT_KEY)); return ROT_T[r] !== undefined ? r : 0; } catch (e) { return 0; } }
+  function setRotation(r) { try { if (r) localStorage.setItem(ROT_KEY, String(r)); else localStorage.removeItem(ROT_KEY); } catch (e) {} }
+  function applyRotation() {
+    const r = getRotation(), tall = r % 180 !== 0;
+    const root = document.getElementById('mapRoot');
+    if (r) root.setAttribute('transform', ROT_T[r]); else root.removeAttribute('transform');
+    // Lite marginal runt kartan så att rättvända texter vid kanterna inte klipps av.
+    svg.setAttribute('viewBox', tall ? '-60 -60 1840 2120' : '-60 -60 2120 1840');
+    mapCard.style.setProperty('--ratio', tall ? (1840/2120) : (2120/1840));
+    // Texterna vrids tillbaka så att de alltid står rättvända.
+    root.querySelectorAll('text').forEach(function (t) {
+      if (t.classList.contains('you-text')) return;
+      if (!r) { t.removeAttribute('transform'); return; }
+      t.setAttribute('transform', 'rotate(' + (-r) + ' ' + t.getAttribute('x') + ' ' + t.getAttribute('y') + ')');
+    });
+    // "Du är här" läggs alltid på den sida av pricken som vetter in mot butiken (bort från entrén).
+    const yt = root.querySelector('.you-text');
+    const off = r % 180 ? 76 : 52;
+    yt.setAttribute('x', -off); yt.setAttribute('y', 0);
+    yt.setAttribute('transform', r ? 'rotate(' + (-r) + ' ' + (-off) + ' 0)' : '');
+    yt.style.textAnchor = { 0:'end', 90:'middle', 180:'start', 270:'middle' }[r];
+    updatePreview();
+  }
+  function updatePreview() {
+    const box = document.getElementById('mapPreview'), txt = document.getElementById('rotText');
+    if (!box) return;
+    txt.textContent = ROT_NAMES[getRotation()];
+    const c = svg.cloneNode(true);
+    c.removeAttribute('id'); c.classList.remove('dim');
+    c.querySelectorAll('[id]').forEach(function (e) { e.removeAttribute('id'); });
+    c.querySelectorAll('.on').forEach(function (e) { e.classList.remove('on'); });
+    box.textContent = ''; box.appendChild(c);
+    box.classList.toggle('off', !mapEnabled());
+    const sum = document.getElementById('mapSummary');
+    sum.textContent = mapEnabled() ? 'På' : 'Av';
+    sum.classList.toggle('on', mapEnabled());
+  }
+  applyRotation();
+
+  // Mittpunkt räknas från formens egna mått, så den blir rätt även när kartan är dold.
+  function center([tag, a]) {
+    if (tag === 'rect') return [a.x + a.width/2, a.y + a.height/2];
+    const p = a.points.trim().split(/\s+/).map(q => q.split(',').map(Number));
+    return [p.reduce((s,q) => s+q[0], 0)/p.length, p.reduce((s,q) => s+q[1], 0)/p.length];
+  }
+  function highlight(code) {
+    if (current) { current.zone.classList.remove('on'); current.text.classList.remove('on'); }
+    current = zones[code] || null;
+    pulse.classList.remove('on'); route.classList.remove('on'); svg.classList.remove('dim');
+    if (!current) { hideMap(); return; }
+    current.zone.classList.add('on'); current.text.classList.add('on');
+    showMap();                                   // visa kartan först, sedan räknas allt ut
+    const [cx, cy] = center(current.shape);
+    pulse.setAttribute('cx', cx); pulse.setAttribute('cy', cy);
+    void pulse.getBoundingClientRect(); pulse.classList.add('on');
+    route.setAttribute('d', routeTo(current, cx, cy)); route.classList.add('on');
+    svg.classList.add('dim');
+    hint.innerHTML = 'Gå till <strong>hyllsida ' + code + '</strong>';
+  }
+
   // ---------- Sök ----------
   function clean(value) { return value.trim().toUpperCase().replace(/\s+/g,''); }
   function clear() {
     result.hidden=true;
     message.hidden=true;
     shelf.textContent='';
+    highlight(null);
   }
   function selectLater() {
     clearTimeout(selectionTimer);
@@ -278,20 +730,48 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
       shelf.textContent=products[code];
       result.hidden=false;
       message.hidden=true;
+      if (!quiet) highlight(mapEnabled() ? products[code] : null);
     } else {
       result.hidden=true;
       message.textContent='Artikelnumret hittades inte';
       message.hidden=false;
+      highlight(null);
+      // Rapportera till "Sökt men saknas": direkt vid Enter/skanning, annars när man slutat skriva en stund.
+      clearTimeout(missingTimer);
+      if (final && !quiet) reportMissing(code);
+      else if (!quiet) missingTimer = setTimeout(function () { if (clean(field.value) === code) reportMissing(code); }, 2500);
     }
     if(!quiet) selectLater();
+  }
+
+  // Sökningar som inte gav träff skickas till adminlistan "Sökt men saknas".
+  let lastMissing = '', lastMissingAt = 0, missingTimer = 0;
+  function reportMissing(code) {
+    if (!/^[A-Z0-9-]{1,30}$/.test(code)) return;
+    if (code === lastMissing && Date.now() - lastMissingAt < 5000) return;   // samma skanning två gånger
+    lastMissing = code; lastMissingAt = Date.now();
+    fetch('/api/saknas', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ artikelnummer: code }), keepalive:true }).catch(function(){});
+  }
+
+  // Skärmen töms av sig själv en stund efter sista sökningen, så nästa kund möts av en tom skärm.
+  const RESET_MS = 30 * 1000;
+  let resetTimer = 0;
+  function scheduleReset() {
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(function () {
+      if (!document.getElementById('admin').hidden) return;
+      if (field.value || !result.hidden || !message.hidden) { field.value = ''; clear(); field.focus(); }
+    }, RESET_MS);
   }
   field.addEventListener('input',function(){
     clearTimeout(selectionTimer);
     lookup(false);
+    scheduleReset();
   });
   form.addEventListener('submit',function(e){
     e.preventDefault();
     lookup(true);
+    scheduleReset();
     field.focus();
     field.select();
   });
@@ -357,8 +837,10 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
   }
   function showAdmin() {
     loginView.hidden=true; adminView.hidden=false;
-    adminSearch.value=''; closeEditor(); notice(adminNotice,'');
-    loadList(); resetIdle(); adminSearch.focus();
+    mapToggle.checked = mapEnabled(); updatePreview(); $('mapSettings').open = false;
+    adminSearch.value=''; closeEditor(); closeImport(); notice(adminNotice,'');
+    $('missingBox').open = false; $('logBox').open = false;
+    loadList(); refreshLogs(); resetIdle(); adminSearch.focus();
   }
 
   loginForm.addEventListener('submit', async function(e){
@@ -429,13 +911,17 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
     fNr.readOnly = !!a;
     fShelf.value = a ? a.hyllsida : '';
     fDesc.value = a ? (a.beteckning || '') : '';
+    editingShelf = a ? a.hyllsida : null; shelfWarned = null; saveBtn.textContent = 'Spara';
     deleteBtn.hidden = !a;
+    if (!importPanel.hidden) closeImport();
     editor.hidden = false;
     notice(adminNotice,'');
     window.scrollTo({ top:0, behavior:'smooth' });
     (a ? fShelf : fNr).focus();
   }
   function closeEditor() { editor.hidden = true; editing = null; }
+  let editingShelf = null, shelfWarned = null;
+  fShelf.addEventListener('input', function () { if (shelfWarned !== null) { shelfWarned = null; saveBtn.textContent = 'Spara'; notice(adminNotice, ''); } });
 
   editor.addEventListener('submit', async function(e){
     e.preventDefault();
@@ -443,6 +929,14 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
     const body = { artikelnummer: nr, hyllsida: fShelf.value.trim(), beteckning: fDesc.value.trim() };
     if (!nr) { notice(adminNotice,'Fyll i artikelnummer','error'); fNr.focus(); return; }
     if (!body.hyllsida) { notice(adminNotice,'Fyll i hyllsida','error'); fShelf.focus(); return; }
+    // Varna om hyllsidan inte finns på kartan (troligen ett skrivfel). Ett andra tryck på Spara sparar ändå.
+    const h = body.hyllsida;
+    if (!zones[h] && h !== editingShelf && shelfWarned !== h) {
+      shelfWarned = h; saveBtn.textContent = 'Spara ändå';
+      const tips = /^\d$/.test(h) && zones['0' + h] ? ' Menade du 0' + h + '?' : '';
+      notice(adminNotice, 'Hyllsida ' + h + ' finns inte på kartan.' + tips + ' Kontrollera och tryck Spara ändå om den är rätt.', 'error');
+      fShelf.focus(); fShelf.select(); return;
+    }
     saveBtn.disabled = true;
     try {
       if (editing) await call('PUT','/api/admin/artiklar/' + encodeURIComponent(editing), body);
@@ -450,7 +944,7 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
       notice(adminNotice, (editing ? 'Sparat: ' : 'Tillagd: ') + nr + ' på hyllsida ' + body.hyllsida, 'ok');
       closeEditor();
       adminSearch.value = nr;
-      loadList(); sync(true);
+      loadList(); refreshLogs(); sync(true);
     } catch (err) { if (err.message !== '401') notice(adminNotice, err.message, 'error'); }
     finally { saveBtn.disabled = false; }
   });
@@ -463,11 +957,367 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
     try {
       await call('DELETE','/api/admin/artiklar/' + encodeURIComponent(nr));
       notice(adminNotice, 'Borttagen: ' + nr, 'ok');
-      closeEditor(); loadList(); sync(true);
+      closeEditor(); loadList(); refreshLogs(); sync(true);
     } catch (err) { if (err.message !== '401') notice(adminNotice, err.message, 'error'); }
     finally { deleteBtn.disabled = false; }
   });
 
+
+  // ---------- Import och export ----------
+  const importPanel=$('importPanel'), importResult=$('importResult'), importChips=$('importChips'), importRows=$('importRows');
+  const importMore=$('importMore'), importSave=$('importSave'), importNotice=$('importNotice');
+  const importFile=$('importFile'), importFileName=$('importFileName'), importPaste=$('importPaste');
+  let analysis = null, existing = null, pasteTimer = 0;
+  // ---------- Egen liten Excel-läsare/skrivare (.xlsx är en zip-fil med XML inuti) ----------
+  async function unzip(buf) {
+    const dv = new DataView(buf), u8 = new Uint8Array(buf), files = {};
+    let e = buf.byteLength - 22;
+    while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+    if (e < 0) throw new Error('Filen är inte en giltig Excel-fil (.xlsx)');
+    let p = dv.getUint32(e + 16, true);
+    const n = dv.getUint16(e + 10, true);
+    for (let i = 0; i < n; i++) {
+      const method = dv.getUint16(p + 10, true), size = dv.getUint32(p + 20, true);
+      const nameLen = dv.getUint16(p + 28, true), extra = dv.getUint16(p + 30, true), comment = dv.getUint16(p + 32, true);
+      const local = dv.getUint32(p + 42, true);
+      const name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nameLen));
+      const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
+      files[name] = { method: method, data: u8.subarray(start, start + size) };
+      p += 46 + nameLen + extra + comment;
+    }
+    return async function read(name) {
+      const f = files[name]; if (!f) return null;
+      if (f.method === 0) return new TextDecoder().decode(f.data);
+      const stream = new Blob([f.data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      return new TextDecoder().decode(await new Response(stream).arrayBuffer());
+    };
+  }
+  async function readXlsx(buf) {
+    const read = await unzip(buf), xml = function (t) { return new DOMParser().parseFromString(t, 'application/xml'); };
+    // Första bladet i arbetsboken
+    const wb = xml(await read('xl/workbook.xml'));
+    const firstSheet = wb.getElementsByTagName('sheet')[0];
+    let path = 'xl/worksheets/sheet1.xml';
+    const rels = await read('xl/_rels/workbook.xml.rels');
+    if (firstSheet && rels) {
+      const id = firstSheet.getAttribute('r:id');
+      const rel = Array.prototype.find.call(xml(rels).getElementsByTagName('Relationship'), function (r) { return r.getAttribute('Id') === id; });
+      if (rel) { const t = rel.getAttribute('Target'); path = t.charAt(0) === '/' ? t.slice(1) : 'xl/' + t; }
+    }
+    const ssText = await read('xl/sharedStrings.xml');
+    const shared = ssText ? Array.prototype.map.call(xml(ssText).getElementsByTagName('si'), function (si) {
+      return Array.prototype.map.call(si.getElementsByTagName('t'), function (t) { return t.textContent; }).join('');
+    }) : [];
+    const sheet = xml(await read(path));
+    const rows = [];
+    Array.prototype.forEach.call(sheet.getElementsByTagName('c'), function (c) {
+      const ref = c.getAttribute('r') || '', m = ref.match(/^([A-Z]+)(\d+)$/); if (!m) return;
+      let col = 0; for (let i = 0; i < m[1].length; i++) col = col * 26 + m[1].charCodeAt(i) - 64;
+      const type = c.getAttribute('t'), v = c.getElementsByTagName('v')[0];
+      let val = '';
+      if (type === 's') val = shared[Number(v && v.textContent)] || '';
+      else if (type === 'inlineStr') val = Array.prototype.map.call(c.getElementsByTagName('t'), function (t) { return t.textContent; }).join('');
+      else val = v ? v.textContent : '';
+      if (/^-?\d+\.0+$/.test(val)) val = val.replace(/\.0+$/, '');
+      const r = Number(m[2]) - 1; (rows[r] = rows[r] || [])[col - 1] = val;
+    });
+    return Array.from(rows, function (r) { return Array.from(r || [], function (x) { return x == null ? '' : x; }); });
+  }
+
+  // Skapar en .xlsx där alla celler är text (så att inledande nollor behålls).
+  const CRC_TABLE = (function () { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    const enc = new TextEncoder(), parts = [], central = []; let offset = 0;
+    files.forEach(function (f) {
+      const name = enc.encode(f.name), data = enc.encode(f.text), crc = crc32(data);
+      const h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true);
+      h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+      const c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true);
+      c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, offset, true);
+      parts.push(h, name, data); central.push(c, name);
+      offset += 30 + name.length + data.length;
+    });
+    const size = central.reduce(function (s, x) { return s + x.byteLength; }, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+    end.setUint32(12, size, true); end.setUint32(16, offset, true);
+    return new Blob(parts.concat(central, [end]), { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  }
+  function makeXlsx(aoa, widths) {
+    const esc = function (v) { return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ''); };
+    const colName = function (i) { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+    const sheetRows = aoa.map(function (r, ri) {
+      return '<row r="' + (ri + 1) + '">' + r.map(function (v, ci) {
+        return '<c r="' + colName(ci) + (ri + 1) + '" t="inlineStr" s="' + (ri ? 1 : 2) + '"><is><t xml:space="preserve">' + esc(v) + '</t></is></c>';
+      }).join('') + '</row>';
+    }).join('');
+    const NS = 'http://schemas.openxmlformats.org/';
+    return zip([
+      { name: '[Content_Types].xml', text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="' + NS + 'package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
+      { name: '_rels/.rels', text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="' + NS + 'package/2006/relationships"><Relationship Id="rId1" Type="' + NS + 'officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: 'xl/workbook.xml', text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="' + NS + 'spreadsheetml/2006/main" xmlns:r="' + NS + 'officeDocument/2006/relationships"><sheets><sheet name="Artiklar" sheetId="1" r:id="rId1"/></sheets></workbook>' },
+      { name: 'xl/_rels/workbook.xml.rels', text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="' + NS + 'package/2006/relationships"><Relationship Id="rId1" Type="' + NS + 'officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="' + NS + 'officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: 'xl/styles.xml', text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="' + NS + 'spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="49" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>' },
+      { name: 'xl/worksheets/sheet1.xml', text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="' + NS + 'spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' + widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1" style="1"/>'; }).join('') + '</cols><sheetData>' + sheetRows + '</sheetData></worksheet>' }
+    ]);
+  }
+
+  // Läser text med tab, semikolon eller komma som avgränsare (klistrat från Excel eller CSV-fil).
+  function parseDelimited(text) {
+    text = text.replace(/^﻿/, '');
+    const first = (text.split(/\r?\n/).find(function (l) { return l.trim(); }) || '');
+    const d = ['\t', ';', ','].map(function (c) { return [c, first.split(c).length]; }).sort(function (a, b) { return b[1] - a[1]; })[0][0];
+    const rows = []; let row = [], cell = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+        else cell += ch;
+      } else if (ch === '"' && cell === '') q = true;
+      else if (ch === d) { row.push(cell); cell = ''; }
+      else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(cell); rows.push(row); row = []; cell = '';
+      } else cell += ch;
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+  }
+
+  async function readFile(file) {
+    if (/\.xls$/i.test(file.name)) throw new Error('Gamla .xls-filer stöds inte. Öppna filen i Excel och spara som .xlsx, eller kopiera och klistra in raderna.');
+    if (/\.xlsx$/i.test(file.name)) return readXlsx(await file.arrayBuffer());
+    const buf = await file.arrayBuffer();
+    let text = new TextDecoder('utf-8').decode(buf);
+    if (text.indexOf('�') >= 0) text = new TextDecoder('windows-1252').decode(buf);   // äldre Excel-CSV
+    return parseDelimited(text);
+  }
+
+  // Tolkar raderna, rättar vanliga Excel-fel och jämför med registret.
+  function analyze(rawRows) {
+    const rows = rawRows.map(function (r) { return r.map(function (c) { return String(c == null ? '' : c).trim(); }); })
+                        .filter(function (r) { return r.some(function (c) { return c; }); });
+    if (!rows.length) return null;
+    let col = { nr: 0, shelf: 1, desc: 2 }, start = 0;
+    const h = rows.slice(0, 5).findIndex(function (r) { return r.some(function (c) { return /artikel|art\.?\s*nr/i.test(c); }); });
+    if (h >= 0) {
+      const head = rows[h], find = function (re) { return head.findIndex(function (c) { return re.test(c); }); };
+      col = { nr: find(/artikel|art\.?\s*nr/i), shelf: find(/hyll/i), desc: find(/beteckn|benämn|beskriv|namn|text/i) };
+      if (col.shelf < 0) return { fatal: 'Hittar ingen kolumn för Hyllsida. Kontrollera rubrikerna.' };
+      start = h + 1;
+    }
+    const out = [], seen = {};
+    rows.slice(start).forEach(function (r, i) {
+      const notes = [], errs = [];
+      let nr = (r[col.nr] || '').toUpperCase().replace(/\s+/g, '');
+      let shelf = (r[col.shelf] || '').replace(/\s+/g, '');
+      const desc = col.desc >= 0 ? (r[col.desc] || '') : '';
+      if (/^\d{1,6}$/.test(nr)) { notes.push(nr + ' → ' + nr.padStart(7, '0')); nr = nr.padStart(7, '0'); }
+      if (/^\d$/.test(shelf)) { notes.push('hylla ' + shelf + ' → 0' + shelf); shelf = '0' + shelf; }
+      if (!nr) errs.push('Artikelnummer saknas');
+      else if (!/^[A-Z0-9-]{1,30}$/.test(nr)) errs.push('Ogiltigt artikelnummer');
+      if (!shelf) errs.push('Hyllsida saknas');
+      else if (shelf.length > 20) errs.push('Hyllsidan är för lång');
+      if (desc.length > 200) errs.push('Beteckningen är för lång');
+      if (nr && seen[nr]) errs.push('Finns flera gånger i listan');
+      if (nr) seen[nr] = true;
+      let status = 'err', warn = false;
+      if (!errs.length) {
+        const old = existing[nr];
+        if (!old) status = 'new';
+        else if (old.hyllsida !== shelf || (desc && desc !== (old.beteckning || ''))) {
+          status = 'chg';
+          if (old.hyllsida !== shelf) notes.unshift('hylla ' + old.hyllsida + ' → ' + shelf);
+          if (desc && desc !== (old.beteckning || '')) notes.push('ny beteckning');
+        } else status = 'same';
+        if (shelf && !zones[shelf]) { warn = true; notes.push('hyllsidan finns inte på kartan'); }
+      }
+      out.push({ rad: start + i + 1, nr: nr, shelf: shelf, desc: desc, status: status, warn: warn, notes: errs.concat(notes) });
+    });
+    return { rows: out };
+  }
+
+  const LABEL = { new: 'Ny', chg: 'Ändras', err: 'Fel', same: 'Oförändrad' };
+  function renderAnalysis() {
+    importResult.hidden = true; notice(importNotice, '');
+    if (!analysis) return;
+    if (analysis.fatal) { notice(importNotice, analysis.fatal, 'error'); return; }
+    const c = { new: 0, chg: 0, same: 0, err: 0, warn: 0 };
+    analysis.rows.forEach(function (r) { c[r.status]++; if (r.warn) c.warn++; });
+    importChips.textContent = '';
+    [['new', c.new + ' nya'], ['chg', c.chg + ' ändras'], ['same', c.same + ' oförändrade'], ['err', c.err + ' med fel'], ['warn', c.warn + ' utanför kartan']]
+      .forEach(function (b) {
+        if (!c[b[0]] && b[0] !== 'new') return;
+        const s = document.createElement('span'); s.className = 'badge ' + (b[0] === 'same' ? '' : b[0]); s.textContent = b[1]; importChips.appendChild(s);
+      });
+    const order = { err: 0, chg: 1, new: 2 };
+    const shown = analysis.rows.filter(function (r) { return r.status !== 'same'; }).sort(function (a, b) { return order[a.status] - order[b.status]; });
+    importRows.textContent = '';
+    shown.slice(0, 300).forEach(function (r) {
+      const tr = document.createElement('tr');
+      const st = document.createElement('td'), b = document.createElement('span');
+      b.className = 'badge ' + r.status; b.textContent = LABEL[r.status]; st.appendChild(b); tr.appendChild(st);
+      [['nr', r.nr || '–'], ['shelf', r.shelf || '–'], ['desc', r.desc || '–'], ['note', (r.status === 'err' ? 'Rad ' + r.rad + ': ' : '') + r.notes.join(', ')]]
+        .forEach(function (x) { const td = document.createElement('td'); td.className = x[0]; td.textContent = x[1]; tr.appendChild(td); });
+      importRows.appendChild(tr);
+    });
+    importMore.hidden = shown.length <= 300;
+    importMore.textContent = 'Visar 300 av ' + shown.length + ' rader.';
+    const n = c.new + c.chg;
+    importSave.disabled = n === 0 || n > 1000;
+    importSave.textContent = n ? 'Spara ' + n + (n === 1 ? ' artikel' : ' artiklar') : 'Inget att spara';
+    importResult.hidden = false;
+    if (n > 1000) notice(importNotice, 'Max 1 000 rader åt gången. Dela upp listan.', 'error');
+    else if (c.err) notice(importNotice, 'Rader med fel sparas inte. Rätta dem i Excel och importera igen, eller spara resten nu.', 'error');
+  }
+
+  async function openImport() {
+    closeEditor();
+    importPanel.hidden = false; importResult.hidden = true; analysis = null;
+    importFile.value = ''; importFileName.textContent = ''; importPaste.value = '';
+    notice(importNotice, 'Hämtar registret…');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      const data = await call('GET', '/api/admin/export');
+      existing = {}; data.artiklar.forEach(function (a) { existing[a.artikelnummer] = a; });
+      notice(importNotice, '');
+    } catch (e) { if (e.message !== '401') notice(importNotice, e.message, 'error'); }
+  }
+  function closeImport() { importPanel.hidden = true; analysis = null; importPaste.value = ''; importFile.value = ''; }
+
+  async function handleRows(getRows) {
+    if (!existing) return;
+    try { analysis = analyze(await getRows()); renderAnalysis(); }
+    catch (e) { analysis = null; renderAnalysis(); notice(importNotice, e.message || 'Kunde inte läsa filen', 'error'); }
+  }
+  importFile.addEventListener('change', function () {
+    const f = importFile.files[0]; if (!f) return;
+    importPaste.value = ''; importFileName.textContent = f.name;
+    notice(importNotice, 'Läser ' + f.name + '…');
+    handleRows(function () { return readFile(f); });
+  });
+  importPaste.addEventListener('input', function () {
+    clearTimeout(pasteTimer);
+    pasteTimer = setTimeout(function () {
+      importFile.value = ''; importFileName.textContent = '';
+      if (!importPaste.value.trim()) { analysis = null; renderAnalysis(); return; }
+      handleRows(function () { return parseDelimited(importPaste.value); });
+    }, 250);
+  });
+  importSave.addEventListener('click', async function () {
+    if (!analysis) return;
+    const rows = analysis.rows.filter(function (r) { return r.status === 'new' || r.status === 'chg'; });
+    const nNew = rows.filter(function (r) { return r.status === 'new'; }).length, nChg = rows.length - nNew;
+    importSave.disabled = true; notice(importNotice, 'Sparar…');
+    try {
+      await call('POST', '/api/admin/import', { artiklar: rows.map(function (r) { return { artikelnummer: r.nr, hyllsida: r.shelf, beteckning: r.desc }; }) });
+      closeImport();
+      notice(adminNotice, 'Klart! ' + nNew + ' tillagda och ' + nChg + ' uppdaterade.', 'ok');
+      adminSearch.value = ''; loadList(); refreshLogs(); sync(true);
+    } catch (e) { if (e.message !== '401') { notice(importNotice, e.message, 'error'); importSave.disabled = false; } }
+  });
+
+  // Export: hela registret som Excel-fil. Artikelnummer sparas som text så att inledande nollor behålls.
+  const exportBtn = $('exportBtn');
+  exportBtn.addEventListener('click', async function () {
+    exportBtn.disabled = true; notice(adminNotice, 'Skapar Excel-fil…');
+    const date = new Date().toISOString().slice(0, 10);
+    try {
+      const data = await call('GET', '/api/admin/export');
+      const aoa = [['Artikelnummer', 'Hyllsida', 'Beteckning']].concat(data.artiklar.map(function (a) { return [a.artikelnummer, a.hyllsida, a.beteckning || '']; }));
+      const blob = makeXlsx(aoa, [16, 10, 40]);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob); link.download = 'hyllsok-backup-' + date + '.xlsx';
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(function () { URL.revokeObjectURL(link.href); }, 2000);
+      notice(adminNotice, 'Exporterat ' + data.artiklar.length.toLocaleString('sv-SE') + ' artiklar.', 'ok');
+    } catch (e) { if (e.message !== '401') notice(adminNotice, e.message, 'error'); }
+    finally { exportBtn.disabled = false; }
+  });
+  $('importBtn').addEventListener('click', openImport);
+  $('closeImport').addEventListener('click', closeImport);
+  $('importCancel').addEventListener('click', closeImport);
+
+
+  // ---------- Sökt men saknas + ändringslogg ----------
+  function fmtTime(iso) {
+    try { return new Date(iso).toLocaleString('sv-SE', { timeZone:'Europe/Stockholm', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }); }
+    catch (e) { return iso; }
+  }
+  function logRow(title, meta, buttons, done) {
+    const row = document.createElement('div'); row.className = 'log-row' + (done ? ' done' : '');
+    const main = document.createElement('div'); main.className = 'log-main';
+    const t = document.createElement('div'); t.className = 'log-title'; t.textContent = title;
+    const m = document.createElement('div'); m.className = 'log-meta'; m.textContent = meta;
+    main.append(t, m); row.appendChild(main);
+    buttons.forEach(function (b) { row.appendChild(b); });
+    return row;
+  }
+  function smallBtn(text, onClick) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-sm'; b.textContent = text;
+    b.addEventListener('click', onClick); return b;
+  }
+  function emptyRow(box, text) { const d = document.createElement('div'); d.className = 'log-empty'; d.textContent = text; box.appendChild(d); }
+
+  async function loadMissing() {
+    const box = $('missingList'), chip = $('missingChip');
+    try {
+      const data = await call('GET', '/api/admin/saknas');
+      const n = data.saknas.length;
+      chip.textContent = n ? n + (n === 1 ? ' artikel' : ' artiklar') : 'Inga';
+      chip.classList.toggle('warn', n > 0);
+      box.textContent = '';
+      if (!n) { emptyRow(box, 'Inga sökningar utan träff de senaste 90 dagarna.'); return; }
+      data.saknas.forEach(function (s) {
+        box.appendChild(logRow(s.artikelnummer,
+          'Sökt ' + s.antal + (s.antal === 1 ? ' gång' : ' gånger') + ' · senast ' + fmtTime(s.senast),
+          [ smallBtn('Lägg till', function () { openEditor(null); fNr.value = s.artikelnummer; fShelf.focus(); }),
+            smallBtn('Ta bort', async function () {
+              try { await call('DELETE', '/api/admin/saknas/' + encodeURIComponent(s.artikelnummer)); loadMissing(); }
+              catch (e) { if (e.message !== '401') notice(adminNotice, e.message, 'error'); }
+            }) ]));
+      });
+    } catch (e) { if (e.message !== '401') { box.textContent = ''; emptyRow(box, e.message); } }
+  }
+
+  async function loadLog() {
+    const box = $('logList'), chip = $('logChip');
+    try {
+      const data = await call('GET', '/api/admin/andringar');
+      box.textContent = '';
+      chip.textContent = data.andringar.length ? 'Senast ' + fmtTime(data.andringar[0].tid) : '';
+      if (!data.andringar.length) { emptyRow(box, 'Inga ändringar ännu.'); return; }
+      data.andringar.forEach(function (a) {
+        let btns;
+        if (a.angrad) { const tag = document.createElement('span'); tag.className = 'log-tag'; tag.textContent = 'Ångrad'; btns = [tag]; }
+        else btns = [smallBtn('Ångra', async function () {
+          if (!confirm('Ångra: ' + a.beskrivning + '?')) return;
+          try {
+            await call('POST', '/api/admin/andringar/' + a.id + '/angra');
+            notice(adminNotice, 'Ångrat: ' + a.beskrivning, 'ok');
+            loadList(); refreshLogs(); sync(true);
+          } catch (e) { if (e.message !== '401') notice(adminNotice, e.message, 'error'); }
+        })];
+        box.appendChild(logRow(a.beskrivning, fmtTime(a.tid) + (a.antal > 1 ? ' · ' + a.antal + ' artiklar' : ''), btns, a.angrad));
+      });
+    } catch (e) { if (e.message !== '401') { box.textContent = ''; emptyRow(box, e.message); } }
+  }
+  function refreshLogs() { loadMissing(); loadLog(); }
+
+  const mapToggle = $('mapToggle');
+  mapToggle.checked = mapEnabled();
+  mapToggle.addEventListener('change', function(){
+    setMapEnabled(mapToggle.checked);
+    if (!mapToggle.checked) highlight(null);
+    updatePreview();
+  });
+  $('rotBtn').addEventListener('click', function(){
+    const r = (getRotation() + 90) % 360;
+    setRotation(r); applyRotation();
+  });
   $('openAdmin').addEventListener('click', openAdmin);
   $('cancelLogin').addEventListener('click', closeAdmin);
   $('logoutBtn').addEventListener('click', logout);
@@ -475,7 +1325,8 @@ td.empty-row { text-align:center; color:var(--hint); cursor:default; padding:28p
   $('cancelEdit').addEventListener('click', closeEditor);
   admin.addEventListener('keydown', function(e){
     if (e.key !== 'Escape') return;
-    if (!editor.hidden) closeEditor();
+    if (!importPanel.hidden) closeImport();
+    else if (!editor.hidden) closeEditor();
     else if (!loginView.hidden) closeAdmin();
   });
   if (location.hash === '#admin') openAdmin();
